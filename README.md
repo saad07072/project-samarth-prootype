@@ -34,7 +34,7 @@ Frontend: HTML, Tailwind CSS, JavaScript
 Setup & Installation
 Follow these steps to run the prototype on your local machine.
 1. Clone the Repository
-git clone [https://github.com/your-username/project-samarth.git](https://github.com/your-username/project-samarth.git)
+git clone [https://github.com/your-username/project-samarth.git](https://github.com/saad07072/project-samarth.git)
 cd project-samarth
 
 
