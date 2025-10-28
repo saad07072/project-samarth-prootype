@@ -5,6 +5,7 @@ import json
 import requests
 import time  # For retry logic
 from flask import Flask, request, jsonify, render_template_string
+import os  # For production deployment (reading PORT)
 
 # --- Configuration ---
 AGRI_DATA_PATH = 'agri.csv'
@@ -90,8 +91,10 @@ def load_and_prepare_data():
         df_columns = json.dumps(master_df.columns.tolist())
         
         print(f"Data integration complete. Master DataFrame has {len(master_df)} rows.")
-        print("Sample of merged data:")
-        print(master_df[['Year', 'State', 'District', 'RICE PRODUCTION (1000 tons)', 'Total_Annual_Rainfall_mm', 'Mean_Annual_Soil_Moisture']].dropna().head())
+        print("Sample of merged data (climate columns will be NaN if years don't overlap with agri data):")
+        # Removed .dropna() to show the NaN values from the merge, which is expected
+        # if the sample data years (e.g., 2016 vs 2024) do not align.
+        print(master_df[['Year', 'State', 'District', 'RICE PRODUCTION (1000 tons)', 'Total_Annual_Rainfall_mm', 'Mean_Annual_Soil_Moisture']].head())
         print(f"Columns available for queries: {df_columns}")
 
     except FileNotFoundError as e:
@@ -185,7 +188,6 @@ def ask_question():
     The main Q&A endpoint.
     Receives a question, generates code, executes it, and synthesizes an answer.
     """
-    # === FIX 1: Removed redundant local import. The global import at line 1 is used. ===
     
     if API_KEY == "PASTE_YOUR_GEMINI_API_KEY_HERE" or API_KEY == "":
         print("ERROR: API_KEY is not set in app.py")
@@ -194,7 +196,7 @@ def ask_question():
     if master_df is None:
         return jsonify({"error": "Data is not loaded. Please check server logs for file path errors."}), 500
 
-    # === FIX 2: Replaced unsafe `request.json.get` with robust `request.get_json()` ===
+    # Robustly get JSON data from the request
     data = request.get_json()
     if not data:
         print("Error: Request received without a valid JSON body or Content-Type header.")
@@ -242,7 +244,7 @@ result = df_filtered['RICE PRODUCTION (1000 tons)'].sum()
     exec_error = None
     
     # Create a local context for exec. Pass a copy of the dataframe.
-    # 'pd' now refers to the global import from the top of the file.
+    # 'pd' refers to the global import from the top of the file.
     local_context = {"df": master_df.copy(), "pd": pd}
     
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -518,11 +520,19 @@ if __name__ == "__main__":
     
     if master_df is not None:
         print("\n--- Project Samarth Server is RUNNING ---")
-        print("Open [http://127.0.0.1:5000](http://127.0.0.1:5000) in your browser.")
+        
+        # --- Production-Ready Deployment Fix ---
+        # Use the PORT environment variable provided by the deployment service (or default to 5000)
+        port = int(os.environ.get('PORT', 5000))
+        
+        # Bind to '0.0.0.0' to be accessible by the service's router
+        # Turn off debug mode (it's a security risk in production)
+        print(f"Binding to host 0.0.0.0 on port {port}")
         print("------------------------------------------\n")
-        app.run(debug=True, port=5000)
+        app.run(debug=False, port=port, host='0.0.0.0')
     else:
         print("\n--- Project Samarth Server FAILED TO START ---")
         print("Master DataFrame could not be loaded. Please check file paths and errors above.")
         print("--------------------------------------------\n")
+
 
