@@ -16,7 +16,7 @@ SOIL_DATA_PATH = 'soil.csv'
 # !!! IMPORTANT: YOU MUST ADD YOUR OWN API KEY HERE FOR THE APP TO WORK      !!!
 # !!! Get a key from Google AI Studio: https://aistudio.google.com/app/keys  !!!
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-API_KEY = "PASTE_YOUR_GEMINI_API_KEY_HERE" # <--- PASTE YOUR KEY HERE
+API_KEY = "AIzaSyDCTHgM-9JRGW9DcClCwXtZZ8Vd3bUwXjc" # <--- PASTE YOUR KEY HERE
 
 # NOTE: If API_KEY is set to "PASTE_YOUR_GEMINI_API_KEY_HERE" or is empty, the app will not work.
 MODEL_ENDPOINT = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key={API_KEY}"
@@ -185,6 +185,9 @@ def ask_question():
     The main Q&A endpoint.
     Receives a question, generates code, executes it, and synthesizes an answer.
     """
+    # === FIX 1: Import pandas here to ensure it's in the local scope ===
+    import pandas as pd
+    
     if API_KEY == "PASTE_YOUR_GEMINI_API_KEY_HERE" or API_KEY == "":
         print("ERROR: API_KEY is not set in app.py")
         return jsonify({"error": "Server-side configuration error: The Gemini API key is not set. Please add your API key to the 'API_KEY' variable in app.py."}), 500
@@ -233,7 +236,6 @@ result = df_filtered['RICE PRODUCTION (1000 tons)'].sum()
     exec_error = None
     
     # Create a local context for exec. Pass a copy of the dataframe.
-    # 'pd' is imported at the top of the file, so it's in the global scope.
     local_context = {"df": master_df.copy(), "pd": pd}
     
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -242,7 +244,8 @@ result = df_filtered['RICE PRODUCTION (1000 tons)'].sum()
     # !!! A production system MUST use a secure sandboxed env.     !!!
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     try:
-        exec(cleaned_code, globals(), local_context)
+        # === FIX 2: Pass an empty dict {} for globals for a stricter sandbox ===
+        exec(cleaned_code, {}, local_context)
         data_result = local_context.get('result')
         
         # Convert pandas objects to JSON-serializable formats
@@ -329,12 +332,15 @@ HTML_TEMPLATE = """
 </head>
 <body class="h-full flex flex-col items-center justify-start text-gray-100 p-4 md:p-8">
     <div class="w-full max-w-4xl">
+        <!-- Header -->
         <header class="text-center mb-8">
             <h1 class="text-4xl md:text-5xl font-bold text-white mb-2">Project Samarth</h1>
             <p class="text-lg md:text-xl text-blue-300">Intelligent Q&A for India's Agricultural & Climate Data</p>
         </header>
 
+        <!-- Main Content -->
         <main class="w-full">
+            <!-- Input Form -->
             <form id="qa-form" class="mb-8">
                 <div class="relative">
                     <input type="text" id="question-input"
@@ -347,26 +353,32 @@ HTML_TEMPLATE = """
                 </div>
             </form>
 
+            <!-- Loading Spinner -->
             <div id="loader" class="hidden flex-col items-center justify-center my-10">
                 <div class="spinner w-12 h-12 rounded-full border-4 border-gray-700 border-t-blue-500 mb-4"></div>
                 <p class="text-lg text-gray-400">Synthesizing answer... This may take a moment.</p>
             </div>
 
+            <!-- Results Area -->
             <div id="results-container" class="hidden bg-gray-800 rounded-lg shadow-2xl overflow-hidden">
+                <!-- Synthesized Answer -->
                 <div class="p-6 border-b border-gray-700">
                     <h2 class="text-2xl font-semibold text-white mb-4">Synthesized Answer</h2>
-                    <div id="answer-text" class_:"text-lg text-gray-200 leading-relaxed whitespace-pre-wrap"></div>
+                    <div id="answer-text" class="text-lg text-gray-200 leading-relaxed whitespace-pre-wrap"></div>
                 </div>
 
+                <!-- Traceability Details -->
                 <div class="p-6">
                     <h3 class="text-xl font-semibold text-blue-300 mb-4">Traceability & Data</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Generated Code -->
                         <div>
                             <label class="block text-sm font-medium text-gray-400 mb-2">Generated Code</label>
                             <pre class="bg-gray-900 rounded-lg p-4 text-sm text-yellow-300 overflow-x-auto">
 <code id="generated-code"></code>
                             </pre>
                         </div>
+                        <!-- Raw Data Result -->
                         <div>
                             <label class="block text-sm font-medium text-gray-400 mb-2">Raw Data Result</label>
                             <pre class="bg-gray-900 rounded-lg p-4 text-sm text-gray-300 overflow-auto max-h-60">
@@ -377,11 +389,13 @@ HTML_TEMPLATE = """
                 </div>
             </div>
             
+            <!-- Error Message -->
             <div id="error-container" class="hidden bg-red-900 border border-red-700 text-red-100 p-4 rounded-lg">
                 <h3 class="font-bold mb-2">An Error Occurred</h3>
                 <p id="error-text"></p>
             </div>
 
+            <!-- Sample Questions -->
             <div class="mt-12">
                 <h3 class="text-xl font-semibold text-gray-300 mb-4">Sample Questions to Try</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -447,9 +461,11 @@ HTML_TEMPLATE = """
                 
                 // Try to pretty-print JSON data
                 try {
+                    // Check if data_result is already a JSON string
                     const jsonData = JSON.parse(data.data_result);
                     dataResult.textContent = JSON.stringify(jsonData, null, 2);
                 } catch {
+                    // If it's not a JSON string, just display it
                     dataResult.textContent = data.data_result;
                 }
 
