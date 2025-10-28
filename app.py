@@ -16,7 +16,7 @@ SOIL_DATA_PATH = 'soil.csv'
 # !!! IMPORTANT: YOU MUST ADD YOUR OWN API KEY HERE FOR THE APP TO WORK      !!!
 # !!! Get a key from Google AI Studio: https://aistudio.google.com/app/keys  !!!
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-API_KEY = "AIzaSyDCTHgM-9JRGW9DcClCwXtZZ8Vd3bUwXjc" # <--- PASTE YOUR KEY HERE
+API_KEY = "PASTE_YOUR_GEMINI_API_KEY_HERE" # <--- PASTE YOUR KEY HERE
 
 # NOTE: If API_KEY is set to "PASTE_YOUR_GEMINI_API_KEY_HERE" or is empty, the app will not work.
 MODEL_ENDPOINT = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key={API_KEY}"
@@ -185,8 +185,7 @@ def ask_question():
     The main Q&A endpoint.
     Receives a question, generates code, executes it, and synthesizes an answer.
     """
-    # === FIX 1: Import pandas here to ensure it's in the local scope ===
-    import pandas as pd
+    # === FIX 1: Removed redundant local import. The global import at line 1 is used. ===
     
     if API_KEY == "PASTE_YOUR_GEMINI_API_KEY_HERE" or API_KEY == "":
         print("ERROR: API_KEY is not set in app.py")
@@ -195,9 +194,16 @@ def ask_question():
     if master_df is None:
         return jsonify({"error": "Data is not loaded. Please check server logs for file path errors."}), 500
 
-    question = request.json.get('question')
+    # === FIX 2: Replaced unsafe `request.json.get` with robust `request.get_json()` ===
+    data = request.get_json()
+    if not data:
+        print("Error: Request received without a valid JSON body or Content-Type header.")
+        return jsonify({"error": "Invalid request: No JSON body or incorrect Content-Type."}), 400
+        
+    question = data.get('question')
     if not question:
-        return jsonify({"error": "No question provided."}), 400
+        print("Error: JSON body received, but 'question' field is missing.")
+        return jsonify({"error": "Invalid request: 'question' field is missing from JSON body."}), 400
 
     print(f"\nReceived new question: {question}")
 
@@ -236,6 +242,7 @@ result = df_filtered['RICE PRODUCTION (1000 tons)'].sum()
     exec_error = None
     
     # Create a local context for exec. Pass a copy of the dataframe.
+    # 'pd' now refers to the global import from the top of the file.
     local_context = {"df": master_df.copy(), "pd": pd}
     
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -244,7 +251,7 @@ result = df_filtered['RICE PRODUCTION (1000 tons)'].sum()
     # !!! A production system MUST use a secure sandboxed env.     !!!
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     try:
-        # === FIX 2: Pass an empty dict {} for globals for a stricter sandbox ===
+        # Pass an empty dict {} for globals for a stricter sandbox
         exec(cleaned_code, {}, local_context)
         data_result = local_context.get('result')
         
@@ -511,10 +518,11 @@ if __name__ == "__main__":
     
     if master_df is not None:
         print("\n--- Project Samarth Server is RUNNING ---")
-        print("Open http://127.0.0.1:5000 in your browser.")
+        print("Open [http://127.0.0.1:5000](http://127.0.0.1:5000) in your browser.")
         print("------------------------------------------\n")
         app.run(debug=True, port=5000)
     else:
         print("\n--- Project Samarth Server FAILED TO START ---")
         print("Master DataFrame could not be loaded. Please check file paths and errors above.")
         print("--------------------------------------------\n")
+
